@@ -1,0 +1,19 @@
+# Gestionale Bar — PWA + Storico Ordini
+Questa versione aggiornata include:
+- Salvataggio automatico dello storico ordini (`orders_history`) quando serviti o eliminati
+- Progressive Web App (PWA) installabile su smartphone, fullscreen
+- Cameriere e Bancone come prima, menù modificabile, note, articolo libero, totale
+- Hosting gratuito su Firebase (piano free)
+
+## Installazione
+1. Crea progetto Firebase con Realtime Database e Hosting
+2. Sostituisci firebaseConfig in `index.html` e `bancone.html`
+3. Carica files su Firebase Hosting o tramite GitHub Actions
+4. Apri il link fornito da Firebase su smartphone e aggiungi a Home per usare come PWA
+
+## Files principali
+- index.html → Cameriere
+- bancone.html → Bancone
+- manifest.json → PWA config
+- sw.js → Service Worker
+- README.md → Istruzioni
