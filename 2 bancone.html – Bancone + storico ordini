@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Bancone</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-database-compat.js"></script>
+<style>
+body{font-family:system-ui;margin:12px;}
+.ordine{border:1px dashed #ddd;padding:6px;margin:6px 0;}
+button{padding:6px; margin:2px;}
+</style>
+</head>
+<body>
+<h2>Bancone</h2>
+<div id="ordini"></div>
+<h3>Gestione Menù</h3>
+<input id="prodName" placeholder="Nome">
+<input id="prodPrice" type="number" step="0.01" placeholder="Prezzo">
+<button onclick="addProduct()">Aggiungi</button>
+<ul id="menuList"></ul>
+
+<script>
+// Config Firebase: sostituisci con i tuoi valori
+const firebaseConfig = {
+apiKey:"YOUR_API_KEY",
+authDomain:"YOUR_PROJECT.firebaseapp.com",
+databaseURL:"https://YOUR_PROJECT.firebaseio.com",
+projectId:"YOUR_PROJECT",
+storageBucket:"YOUR_PROJECT.appspot.com",
+messagingSenderId:"XXXX",
+appId:"XXXX"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+
+// Mostra ordini in realtime
+db.ref("orders").on("value",snap=>{
+  const data=snap.val()||{};
+  const container=document.getElementById("ordini"); container.innerHTML="";
+  Object.entries(data).forEach(([id,o])=>{
+    const div=document.createElement("div"); div.className="ordine";
+    const itemsHtml=(o.items||[]).map(it=>`<li>${it.qty}× ${it.name} €${(it.price*it.qty).toFixed(2)}</li>`).join("");
+    div.innerHTML=`<b>Tavolo ${o.table}</b> • Cameriere: ${o.waiter}<br>
+    Note: ${o.note||"-"}<ul>${itemsHtml}</ul>Total €${o.total.toFixed(2)}<br>
+    Stato: ${o.status}<br>
+    <button onclick="updateStatus('${id}','in preparazione')">In preparazione</button>
+    <button onclick="updateStatus('${id}','pronto')">Pronto</button>
+    <button onclick="updateStatus('${id}','servito')">Servito</button>
+    <button onclick="deleteOrder('${id}')">🗑️</button>`;
+    container.appendChild(div);
+  });
+});
+
+function archiveOrder(orderId){
+  db.ref("orders/"+orderId).once("value").then(snap=>{
+    const d=snap.val(); if(!d) return;
+    db.ref("orders_history").push({...d,archivedAt:Date.now()});
+    db.ref("orders/"+orderId).remove();
+  });
+}
+
+function updateStatus(id,status){
+  if(status==="servito") archiveOrder(id);
+  else db.ref("orders/"+id).update({status});
+}
+
+function deleteOrder(id){ if(confirm("Eliminare ordine?")) archiveOrder(id); }
+
+// Gestione menù
+const menuRef=db.ref("menu");
+menuRef.on("value",snap=>{
+  const data=snap.val()||{};
+  const ul=document.getElementById("menuList"); ul.innerHTML="";
+  Object.entries(data).forEach(([id,it])=>{
+    const li=document.createElement("li");
+    li.innerHTML=`${it.name} €${it.price.toFixed(2)} <button onclick="removeProduct('${id}')">❌</button>`;
+    ul.appendChild(li);
+  });
+});
+
+function addProduct(){ 
+  const name=document.getElementById("prodName").value.trim(); 
+  const price=Number(document.getElementById("prodPrice").value); 
+  if(!name||!price)return; 
+  db.ref("menu").push({name,price}); 
+  document.getElementById("prodName").value=""; 
+  document.getElementById("prodPrice").value=""; 
+}
+
+function removeProduct(id){ if(confirm("Rimuovere?")) db.ref("menu/"+id).remove(); }
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').then(()=>console.log('SW registrato')); }
+</script>
+</body>
+</html>
