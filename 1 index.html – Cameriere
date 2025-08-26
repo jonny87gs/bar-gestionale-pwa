@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Bar - Cameriere</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<style>
+body { font-family: system-ui; margin:0; padding:12px; }
+.hidden { display:none; }
+button { padding:8px; margin:4px; }
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-database-compat.js"></script>
+</head>
+<body>
+<h2>🧑‍🍳 Cameriere</h2>
+<div id="who">non loggato</div>
+
+<section id="loginCard">
+<input id="waiterName" placeholder="Nome cameriere">
+<button onclick="login()">Entra</button>
+</section>
+
+<section id="orderArea" class="hidden">
+<input id="table" placeholder="Tavolo">
+<input id="note" placeholder="Note">
+<ul id="menuList"></ul>
+<ul id="orderList"></ul>
+<input id="customName" placeholder="Articolo libero">
+<input id="customPrice" type="number" step="0.01" placeholder="Prezzo">
+<button onclick="addCustom()">Aggiungi</button>
+<p>Totale: €<span id="total">0.00</span></p>
+<button onclick="sendOrder()">Invia Ordine</button>
+</section>
+
+<script>
+// Config Firebase: sostituisci con i tuoi valori
+const firebaseConfig = {
+apiKey:"YOUR_API_KEY",
+authDomain:"YOUR_PROJECT.firebaseapp.com",
+databaseURL:"https://YOUR_PROJECT.firebaseio.com",
+projectId:"YOUR_PROJECT",
+storageBucket:"YOUR_PROJECT.appspot.com",
+messagingSenderId:"XXXX",
+appId:"XXXX"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let waiter = "";
+let order = [];
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').then(()=>console.log('SW registrato'));
+}
+
+function login(){
+  waiter=document.getElementById("waiterName").value.trim();
+  if(!waiter){alert("Inserisci il nome");return;}
+  document.getElementById("who").textContent=waiter;
+  document.getElementById("loginCard").classList.add("hidden");
+  document.getElementById("orderArea").classList.remove("hidden");
+  loadMenu();
+}
+
+function loadMenu(){
+  db.ref("menu").on("value",snap=>{
+    const data=snap.val()||{};
+    const ul=document.getElementById("menuList"); ul.innerHTML="";
+    Object.entries(data).forEach(([id,item])=>{
+      const li=document.createElement("li");
+      li.innerHTML=`${item.name} €${Number(item.price).toFixed(2)} <button onclick="addItem('${item.name}',${Number(item.price)})">+</button>`;
+      ul.appendChild(li);
+    });
+  });
+}
+
+function addItem(name,price){
+  const idx=order.findIndex(i=>i.name===name&&!i.custom);
+  if(idx>=0) order[idx].qty+=1;
+  else order.push({name,price:Number(price),qty:1});
+  renderOrder();
+}
+
+function addCustom(){
+  const name=document.getElementById("customName").value.trim();
+  const price=Number(document.getElementById("customPrice").value);
+  if(!name||!price) return alert("Completa nome e prezzo");
+  order.push({name,price,qty:1,custom:true});
+  document.getElementById("customName").value="";
+  document.getElementById("customPrice").value="";
+  renderOrder();
+}
+
+function renderOrder(){
+  const ul=document.getElementById("orderList"); ul.innerHTML="";
+  let total=0;
+  order.forEach((it,i)=>{
+    total+=it.price*it.qty;
+    const li=document.createElement("li");
+    li.textContent=`${it.qty}× ${it.name} - €${(it.price*it.qty).toFixed(2)}`;
+    ul.appendChild(li);
+  });
+  document.getElementById("total").textContent=total.toFixed(2);
+}
+
+function sendOrder(){
+  const table=document.getElementById("table").value.trim();
+  const note=document.getElementById("note").value.trim();
+  if(!waiter||!table||order.length===0) return alert("Completa i dati");
+  const itemsExpanded=order.map(it=>({name:it.name,price:Number(it.price),qty:Number(it.qty),custom:!!it.custom}));
+  const total=itemsExpanded.reduce((s,it)=>s+it.price*it.qty,0);
+  const newOrder={waiter,table,note,items:itemsExpanded,total,status:"in attesa",timestamp:Date.now()};
+  db.ref("orders").push(newOrder);
+  order=[]; renderOrder(); document.getElementById("note").value="";
+  alert("Ordine inviato!");
+}
+</script>
+</body>
+</html>
